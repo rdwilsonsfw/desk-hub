@@ -77,14 +77,19 @@ button{cursor:pointer;border:0;background:none}
   .clock{font-size:clamp(80px,min(37vw,21vh),420px)}
   .ico svg{width:clamp(70px,13vmin,170px);height:clamp(70px,13vmin,170px)}
 }
+.cal{display:none}
 @media (orientation:landscape){
-  .panel{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-areas:"clock clock" "dt wx" "wd wx";grid-template-rows:auto auto 1fr;gap:1vmin 4.5vmin;padding:2.6vmin 4vmin}
+  .panel{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-areas:"clock clock" "dt wx" "wd wx" "cal wx";grid-template-rows:auto auto auto 1fr;gap:1vmin 4.5vmin;padding:2.6vmin 4vmin}
   .left{display:contents}
   .clock{grid-area:clock;font-size:clamp(110px,min(29vw,40vh),460px);margin:0}
   .date{grid-area:dt;align-self:end}.wd{grid-area:wd;align-self:start}
   .right{grid-area:wx}
+  .cal{display:grid;grid-area:cal;grid-template-columns:repeat(7,1fr);gap:.4vmin;font-size:clamp(12px,2.3vmin,26px);font-weight:700;text-align:center;align-self:start;max-width:min(100%,62vmin);margin-top:1.4vmin}
+  .cal i{font-style:normal;color:var(--ink3);font-size:.8em;letter-spacing:.08em}
+  .cal b,.cal span{padding:.3em 0}
+  .cal b.today{background:var(--accent);color:#04202f;border-radius:.6em}
 }
-@media (max-height:560px) and (orientation:landscape){.days{display:none}}
+@media (max-height:560px) and (orientation:landscape){.days{display:none}.cal{display:none}}
 
 /* settings */
 .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);z-index:20;padding:20px}
@@ -117,6 +122,7 @@ button{cursor:pointer;border:0;background:none}
     <div class="left">
       <div class="date" id="date"></div>
       <div class="wd" id="wd"></div>
+      <div class="cal" id="cal"></div>
       <div class="clock" aria-live="off"><span id="hm">--:--</span><span class="ap" id="ap"></span><span class="sec" id="sec"></span></div>
     </div>
     <div class="right">
@@ -297,6 +303,8 @@ function loop(t){frame(t);raf=requestAnimationFrame(loop)}
 document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);if(!document.hidden)raf=requestAnimationFrame(loop)});
 addEventListener('resize',()=>{size();initFX()});
 
+function renderCal(d){const y=d.getFullYear(),m=d.getMonth(),first=new Date(y,m,1).getDay(),n=new Date(y,m+1,0).getDate();let h='SMTWTFS'.split('').map(c=>'<i>'+c+'</i>').join('');for(let i=0;i<first;i++)h+='<span></span>';for(let k=1;k<=n;k++)h+='<b'+(k===d.getDate()?' class="today"':'')+'>'+k+'</b>';$('#cal').innerHTML=h}
+
 /* ---------- clock ---------- */
 function tick(){
   const d=new Date();
@@ -309,6 +317,7 @@ function tick(){
   $('#sec').textContent=S.sec?String(d.getSeconds()).padStart(2,'0'):'';
   $('#date').textContent=d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
   $('#wd').textContent=d.toLocaleDateString('en-US',{weekday:'long'});
+  if(FX.day!==d.toDateString()){FX.day=d.toDateString();renderCal(d)}
   const hr=d.getHours();
   document.body.classList.toggle('dim',S.dim&&(hr>=22||hr<6));
   if(FX.min!==d.getMinutes()){FX.min=d.getMinutes();drawScene()}
