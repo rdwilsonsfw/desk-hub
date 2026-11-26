@@ -95,6 +95,15 @@ button{cursor:pointer;border:0;background:none}
 .wx .ico svg{animation:float 6s ease-in-out infinite}
 @keyframes float{50%{transform:translateY(-6px)}}
 
+/* reminders hidden for now: keep only the settings gear */
+.app{grid-template-columns:1fr!important}
+.right{position:fixed;top:max(14px,env(safe-area-inset-top));right:max(18px,env(safe-area-inset-right));z-index:5;min-height:0;min-width:0}
+.rem{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;min-height:0!important;flex:none}
+.rem-h{margin:0}
+.rem-h h2,.list,.add,.add-more{display:none}
+.clock{justify-content:center}
+.greet,.date{text-align:center}
+
 /* alert */
 .alert{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.72);backdrop-filter:blur(8px);z-index:30;padding:24px}
 .alert.on{display:grid}
