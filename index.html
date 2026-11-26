@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hub">
+<meta name="theme-color" content="#0a1624">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Desk Hub</title>
+<style>
+/* Layout idea: landscape = big clock/weather on the left, reminders on the right; portrait stacks them. */
+:root{
+  --bg:#0a1624; --bg2:#10263d; --card:rgba(255,255,255,.07); --edge:rgba(255,255,255,.12);
+  --ink:#f2f7fb; --ink2:#a9bccd; --ink3:#6f869b; --accent:#4cc3ff; --good:#4ade80; --warn:#fbbf24; --bad:#fb7185;
+  --font:ui-rounded,'SF Pro Rounded',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--font);color:var(--ink);background:var(--bg);
+  background-image:radial-gradient(1000px 700px at 15% -10%,#17456b 0,transparent 60%),radial-gradient(800px 600px at 100% 110%,#0f3a52 0,transparent 55%);
+  padding:max(18px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left));
+  overflow:hidden;font-variant-numeric:tabular-nums;transition:filter .6s;user-select:none;-webkit-user-select:none;
+}
+body.dim{filter:brightness(.5)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px}
+.left{display:flex;flex-direction:column;justify-content:space-between;min-width:0;padding:8px 6px}
+.right{display:flex;flex-direction:column;min-height:0;min-width:0}
+
+.clock{font-weight:700;letter-spacing:-.04em;line-height:.9;font-size:clamp(84px,17vw,230px);display:flex;align-items:flex-start}
+.clock .ap{font-size:.2em;font-weight:600;color:var(--ink2);letter-spacing:0;margin:.3em 0 0 .18em}
+.clock .sec{font-size:.28em;color:var(--ink3);margin:.15em 0 0 .25em;font-weight:500;letter-spacing:0}
+.date{font-size:clamp(20px,3.2vw,40px);color:var(--ink2);font-weight:500;margin-top:.4em}
+
+.wx{display:flex;align-items:center;gap:22px;padding:22px 26px;border-radius:28px;background:var(--card);border:1px solid var(--edge)}
+.wx .ico svg{width:clamp(64px,9vw,110px);height:clamp(64px,9vw,110px)}
+.wx .t{font-size:clamp(56px,8vw,104px);font-weight:700;letter-spacing:-.04em;line-height:1}
+.wx .t sup{font-size:.38em;color:var(--ink2);font-weight:600;vertical-align:top;position:relative;top:.2em}
+.wx .c{font-size:clamp(16px,2vw,24px);font-weight:600}
+.wx .m{font-size:clamp(12px,1.4vw,16px);color:var(--ink2);margin-top:4px}
+.wx .loc{margin-left:auto;text-align:right;font-size:12px;color:var(--ink3);align-self:flex-start;line-height:1.5}
+.days{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
+.day{padding:10px 8px;border-radius:18px;background:var(--card);border:1px solid var(--edge);text-align:center;font-size:13px}
+.day b{display:block;color:var(--ink2);font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.day svg{width:30px;height:30px;margin:6px auto 4px;display:block}
+.day .hl{font-weight:700}.day .hl span{color:var(--ink3);font-weight:500}
+.day .p{color:var(--accent);font-size:11px;min-height:14px}
+
+.rem{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px;border-radius:28px;background:var(--card);border:1px solid var(--edge)}
+.rem-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rem-h h2{font-size:20px;font-weight:700}
+.iconbtn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid var(--edge)}
+.iconbtn svg{width:20px;height:20px}
+.list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch;margin:0 -6px;padding:0 6px}
+.item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid transparent;min-height:60px}
+.item.over{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.1)}
+.item.done{opacity:.45}.item.done .tx{text-decoration:line-through}
+.chk{width:34px;height:34px;border-radius:50%;border:2px solid var(--ink3);flex:none;display:grid;place-items:center}
+.item.done .chk{background:var(--good);border-color:var(--good);color:#06240f}
+.chk svg{width:18px;height:18px;opacity:0}.item.done .chk svg{opacity:1}
+.tx{flex:1;min-width:0;font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.when{font-size:12.5px;color:var(--ink2);margin-top:2px;font-weight:500}
+.over .when{color:var(--bad)}
+.del{width:40px;height:40px;border-radius:50%;color:var(--ink3);display:grid;place-items:center}
+.del svg{width:18px;height:18px}
+.empty{color:var(--ink3);text-align:center;padding:36px 10px;font-size:15px}
+.add{display:flex;gap:8px;margin-top:12px}
+.add input[type=text]{flex:1;min-width:0;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.09);border:1px solid var(--edge);font-size:17px;user-select:text;-webkit-user-select:text}
+.btn{padding:0 18px;min-height:50px;border-radius:16px;background:var(--accent);color:#04202f;font-weight:700;font-size:16px}
+.btn.ghost{background:rgba(255,255,255,.09);color:var(--ink);border:1px solid var(--edge)}
+.add-more{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.add-more input,.add-more select{padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.09);border:1px solid var(--edge);font-size:15px;min-height:44px}
+.add-more select option{color:#000}
+.add-more input{flex:1;min-width:180px}
+
+/* alert */
+.alert{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.72);backdrop-filter:blur(8px);z-index:30;padding:24px}
+.alert.on{display:grid}
+.alert .box{width:min(560px,100%);padding:34px;border-radius:32px;background:#12283f;border:2px solid var(--warn);text-align:center;animation:pulse 1.2s infinite}
+.alert small{color:var(--warn);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:13px}
+.alert h3{font-size:clamp(26px,5vw,44px);margin:10px 0 24px;overflow-wrap:anywhere}
+.alert .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+@keyframes pulse{50%{box-shadow:0 0 0 14px rgba(251,191,36,.14)}}
+
+/* settings */
+.modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.7);backdrop-filter:blur(8px);z-index:20;padding:20px}
+.modal.on{display:grid}
+.sheet{width:min(560px,100%);max-height:100%;overflow-y:auto;padding:26px;border-radius:28px;background:#12283f;border:1px solid var(--edge);user-select:text;-webkit-user-select:text}
+.sheet h2{font-size:22px;margin-bottom:16px}
+.sheet label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);font-weight:700;margin:16px 0 6px}
+.sheet input[type=text],.sheet input[type=password],.sheet input[type=search]{width:100%;padding:13px 14px;border-radius:14px;background:rgba(255,255,255,.09);border:1px solid var(--edge);font-size:16px}
+.sheet .hint{font-size:12.5px;color:var(--ink3);margin-top:6px;line-height:1.45}
+.sheet .tog{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--edge);font-size:16px}
+.sheet .tog input{width:24px;height:24px;accent-color:var(--accent)}
+.seg{display:flex;gap:6px}
+.seg button{padding:10px 18px;border-radius:12px;background:rgba(255,255,255,.09);border:1px solid var(--edge);font-weight:700}
+.seg button[aria-pressed=true]{background:var(--accent);color:#04202f;border-color:var(--accent)}
+.res{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.res button{text-align:left;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.07);font-size:15px}
+.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+
+@media (max-width:900px),(orientation:portrait){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr;height:auto;min-height:100%}
+  .rem{min-height:420px}
+  .clock{font-size:clamp(84px,24vw,220px)}
+}
+@media (max-width:560px){.wx{flex-wrap:wrap}.wx .loc{margin-left:0;text-align:left}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="left" aria-label="Time and weather">
+    <div>
+      <div class="clock" id="clock" aria-live="off"><span id="hm">--:--</span><span class="ap" id="ap"></span><span class="sec" id="sec"></span></div>
+      <div class="date" id="date"></div>
+    </div>
+    <div>
+      <div class="wx" id="wx">
+        <div class="ico" id="wico"></div>
+        <div><div class="t" id="wt">--<sup>°</sup></div><div class="c" id="wc">Loading weather</div><div class="m" id="wm"></div></div>
+        <div class="loc" id="wl"></div>
+      </div>
+      <div class="days" id="days"></div>
+    </div>
+  </section>
+
+  <section class="right" aria-label="Reminders">
+    <div class="rem">
+      <div class="rem-h"><h2>Reminders</h2>
+        <button class="iconbtn" id="gear" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></button>
+      </div>
+      <div class="list" id="list"></div>
+      <form class="add" id="addf" autocomplete="off">
+        <input type="text" id="newtext" placeholder="Add a reminder" aria-label="Reminder text" enterkeyhint="done">
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <div class="add-more">
+        <input type="datetime-local" id="newwhen" aria-label="When">
+        <select id="newrep" aria-label="Repeat"><option value="none">Once</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option></select>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="alert" id="alert" role="alertdialog" aria-live="assertive"><div class="box"><small>Reminder</small><h3 id="atext"></h3>
+  <div class="row"><button class="btn" id="adone">Done</button><button class="btn ghost" id="asnz">Snooze 10 min</button></div></div></div>
+
+<div class="modal" id="modal"><div class="sheet" role="dialog" aria-label="Settings">
+  <h2>Settings</h2>
+  <label for="citysearch">City</label>
+  <input type="search" id="citysearch" placeholder="Search a city, then tap a result">
+  <div class="res" id="cityres"></div>
+  <div class="hint" id="curcity"></div>
+
+  <label>Temperature</label>
+  <div class="seg" id="unitseg"><button data-u="f">°F</button><button data-u="c">°C</button></div>
+
+  <label>Display</label>
+  <div class="tog"><span>24-hour clock</span><input type="checkbox" id="h24"></div>
+  <div class="tog"><span>Show seconds</span><input type="checkbox" id="showsec"></div>
+  <div class="tog"><span>Keep screen on</span><input type="checkbox" id="wake"></div>
+  <div class="tog"><span>Dim at night (10 pm to 6 am)</span><input type="checkbox" id="autodim"></div>
+  <div class="tog"><span>Alert sound</span><input type="checkbox" id="sound"></div>
+
+  <label for="wuid">Weather Underground station (optional)</label>
+  <input type="text" id="wuid" placeholder="Station ID, for example KTXDALLA123" autocapitalize="characters" autocorrect="off">
+  <label for="wukey" style="margin-top:10px">Weather Underground API key</label>
+  <input type="password" id="wukey" placeholder="API key" autocorrect="off" autocapitalize="off">
+  <div class="hint">Leave both blank to use Open-Meteo, which needs no key. With a station and key, the big temperature comes from your own station and the forecast still comes from Open-Meteo.</div>
+  <div class="foot"><button class="btn ghost" id="test">Test sound</button><button class="btn" id="save">Done</button></div>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const KEY='deskhub.v1';
+const defaults={loc:{name:'Dallas, Texas',lat:32.7767,lon:-96.797},unit:'f',h24:false,sec:false,wake:true,dim:true,sound:true,wu:{id:'',key:''},rem:[],wx:null};
+let S;
+try{S=Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=Object.assign({},defaults)}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+/* ---------- clock ---------- */
+function tick(){
+  const d=new Date();
+  const o={hour:S.h24?'2-digit':'numeric',minute:'2-digit',hour12:!S.h24};
+  const parts=new Intl.DateTimeFormat('en-US',o).formatToParts(d);
+  const hm=parts.filter(p=>p.type==='hour'||p.type==='minute'||p.type==='literal').map(p=>p.value).join('').replace(/\s/g,'');
+  const ap=(parts.find(p=>p.type==='dayPeriod')||{}).value||'';
+  $('#hm').textContent=hm; $('#ap').textContent=S.h24?'':ap;
+  $('#sec').textContent=S.sec?String(d.getSeconds()).padStart(2,'0'):'';
+  $('#date').textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const hr=d.getHours();
+  document.body.classList.toggle('dim',S.dim&&(hr>=22||hr<6));
+}
+setInterval(tick,1000);tick();
+
+/* ---------- weather ---------- */
+const IC={
+ sun:'<svg viewBox="0 0 64 64" fill="none" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"><circle cx="32" cy="32" r="11" fill="#fbbf24"/><path d="M32 7v7M32 50v7M7 32h7M50 32h7M14 14l5 5M45 45l5 5M50 14l-5 5M19 45l-5 5"/></svg>',
+ moon:'<svg viewBox="0 0 64 64"><path d="M44 40A18 18 0 0 1 24 12a20 20 0 1 0 28 28z" fill="#c7d7ea"/></svg>',
+ part:'<svg viewBox="0 0 64 64"><circle cx="24" cy="24" r="10" fill="#fbbf24"/><path d="M18 50h28a9 9 0 0 0 1-18 12 12 0 0 0-23 3 8 8 0 0 0-6 15z" fill="#d6e2ee"/></svg>',
+ cloud:'<svg viewBox="0 0 64 64"><path d="M16 48h32a11 11 0 0 0 1-22 15 15 0 0 0-29 4 9 9 0 0 0-4 18z" fill="#c3d2e2"/></svg>',
+ fog:'<svg viewBox="0 0 64 64" stroke="#c3d2e2" stroke-width="5" stroke-linecap="round"><path d="M12 24h40M8 34h44M16 44h36"/></svg>',
+ rain:'<svg viewBox="0 0 64 64"><path d="M16 38h32a10 10 0 0 0 1-20 14 14 0 0 0-27 4 8 8 0 0 0-6 16z" fill="#b2c3d6"/><path d="M22 44l-3 9M33 44l-3 9M44 44l-3 9" stroke="#4cc3ff" stroke-width="4" stroke-linecap="round"/></svg>',
+ snow:'<svg viewBox="0 0 64 64"><path d="M16 38h32a10 10 0 0 0 1-20 14 14 0 0 0-27 4 8 8 0 0 0-6 16z" fill="#c3d2e2"/><g fill="#fff"><circle cx="22" cy="48" r="3"/><circle cx="33" cy="52" r="3"/><circle cx="44" cy="48" r="3"/></g></svg>',
+ storm:'<svg viewBox="0 0 64 64"><path d="M16 36h32a10 10 0 0 0 1-20 14 14 0 0 0-27 4 8 8 0 0 0-6 16z" fill="#97a9be"/><path d="M34 36l-8 12h7l-4 11 12-15h-7l4-8z" fill="#fbbf24"/></svg>'
+};
+function wmo(c,day=true){
+  if(c===0)return day?['Clear',IC.sun]:['Clear',IC.moon];
+  if(c<=2)return ['Partly cloudy',IC.part];
+  if(c===3)return ['Cloudy',IC.cloud];
+  if(c===45||c===48)return ['Fog',IC.fog];
+  if(c>=51&&c<=57)return ['Drizzle',IC.rain];
+  if(c>=61&&c<=67||c>=80&&c<=82)return ['Rain',IC.rain];
+  if(c>=71&&c<=77||c>=85&&c<=86)return ['Snow',IC.snow];
+  if(c>=95)return ['Thunderstorms',IC.storm];
+  return ['Cloudy',IC.cloud];
+}
+const toU=(f)=>S.unit==='f'?f:(f-32)*5/9;
+const fmtT=v=>Math.round(v);
+async function getJSON(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
+async function loadWeather(){
+  const f=S.unit==='f';
+  try{
+    const u=`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}`+
+      `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day`+
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max`+
+      `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=5`;
+    const j=await getJSON(u);
+    const w={t:j.current.temperature_2m,feels:j.current.apparent_temperature,h:j.current.relative_humidity_2m,wind:j.current.wind_speed_10m,code:j.current.weather_code,day:j.current.is_day===1,
+      days:j.daily.time.map((d,i)=>({d,code:j.daily.weather_code[i],hi:j.daily.temperature_2m_max[i],lo:j.daily.temperature_2m_min[i],p:j.daily.precipitation_probability_max[i]})),src:'Open-Meteo',at:Date.now()};
+    if(S.wu.id&&S.wu.key){
+      try{
+        const x=await getJSON(`https://api.weather.com/v2/pws/observations/current?stationId=${encodeURIComponent(S.wu.id)}&format=json&units=e&numericPrecision=decimal&apiKey=${encodeURIComponent(S.wu.key)}`);
+        const o=x.observations&&x.observations[0];
+        if(o&&o.imperial&&o.imperial.temp!=null){w.t=o.imperial.temp;w.src='Weather Underground '+S.wu.id;if(o.humidity!=null)w.h=o.humidity;if(o.imperial.windSpeed!=null)w.wind=o.imperial.windSpeed}
+      }catch(e){w.src+=' (station unavailable)'}
+    }
+    S.wx=w;save();
+  }catch(e){/* keep cached */}
+  renderWeather();
+}
+function renderWeather(){
+  const w=S.wx; if(!w){$('#wc').textContent='Weather unavailable. Check the internet connection.';return}
+  const [txt,ico]=wmo(w.code,w.day);
+  $('#wico').innerHTML=ico;
+  $('#wt').innerHTML=fmtT(toU(w.t))+'<sup>°'+S.unit.toUpperCase()+'</sup>';
+  $('#wc').textContent=txt;
+  const wind=S.unit==='f'?Math.round(w.wind)+' mph':Math.round(w.wind*1.609)+' km/h';
+  $('#wm').textContent=`Feels ${fmtT(toU(w.feels))}°  ·  Humidity ${Math.round(w.h)}%  ·  Wind ${wind}`;
+  const age=new Date(w.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  $('#wl').innerHTML=`${S.loc.name}<br>${w.src}<br>Updated ${age}`;
+  $('#days').innerHTML=w.days.map((d,i)=>{
+    const nm=i===0?'Today':new Date(d.d+'T12:00').toLocaleDateString('en-US',{weekday:'short'});
+    return `<div class="day"><b>${nm}</b>${wmo(d.code)[1]}<div class="hl">${fmtT(toU(d.hi))}° <span>${fmtT(toU(d.lo))}°</span></div><div class="p">${d.p>=20?d.p+'% rain':''}</div></div>`;
+  }).join('');
+}
+renderWeather();loadWeather();setInterval(loadWeather,10*60*1000);
+
+/* ---------- reminders ---------- */
+const uid=()=>Math.random().toString(36).slice(2,9);
+const pad=n=>String(n).padStart(2,'0');
+const toLocalInput=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function nextDue(r){
+  let d=new Date(r.due);const now=Date.now();
+  const step=()=>{d=new Date(d.getTime());
+    if(r.rep==='weekly')d.setDate(d.getDate()+7);
+    else{d.setDate(d.getDate()+1);if(r.rep==='weekdays')while([0,6].includes(d.getDay()))d.setDate(d.getDate()+1)}};
+  do{step()}while(d.getTime()<=now);
+  return d.toISOString();
+}
+function whenLabel(r){
+  if(!r.due)return r.rep!=='none'?'':'No time set';
+  const d=new Date(r.due),n=new Date();
+  const t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const same=d.toDateString()===n.toDateString();
+  const tm=new Date(n);tm.setDate(n.getDate()+1);
+  const day=same?'Today':d.toDateString()===tm.toDateString()?'Tomorrow':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const rep={none:'',daily:'  ·  Daily',weekdays:'  ·  Weekdays',weekly:'  ·  Weekly'}[r.rep||'none'];
+  return `${day}, ${t}${rep}`;
+}
+function renderList(){
+  const now=Date.now();
+  const act=S.rem.filter(r=>!r.done).sort((a,b)=>(a.due?+new Date(a.due):9e15)-(b.due?+new Date(b.due):9e15));
+  const done=S.rem.filter(r=>r.done);
+  const row=r=>{const over=!r.done&&r.due&&+new Date(r.due)<=now;
+    return `<div class="item${r.done?' done':''}${over?' over':''}" data-id="${r.id}">
+      <button class="chk" data-act="done" aria-label="Mark done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></button>
+      <div class="tx">${esc(r.text)}<div class="when">${over?'Overdue: ':''}${whenLabel(r)}</div></div>
+      <button class="del" data-act="del" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`};
+  $('#list').innerHTML=(act.length||done.length)?act.map(row).join('')+done.map(row).join(''):'<div class="empty">Nothing on the list. Add a reminder below.</div>';
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const id=b.closest('.item').dataset.id,r=S.rem.find(x=>x.id===id);if(!r)return;
+  if(b.dataset.act==='del')S.rem=S.rem.filter(x=>x!==r);
+  else complete(r);
+  save();renderList();
+});
+function complete(r){
+  if(r.rep&&r.rep!=='none'&&r.due){r.due=nextDue(r);r.alerted=false}
+  else r.done=!r.done;
+}
+function defaultWhen(){const d=new Date();d.setMinutes(0,0,0);d.setHours(d.getHours()+1);return toLocalInput(d)}
+$('#newwhen').value=defaultWhen();
+let useTime=false;
+$('#newwhen').addEventListener('change',()=>useTime=true);
+$('#addf').addEventListener('submit',e=>{
+  e.preventDefault();
+  const text=$('#newtext').value.trim();if(!text)return;
+  const rep=$('#newrep').value;
+  const due=(useTime||rep!=='none')&&$('#newwhen').value?new Date($('#newwhen').value).toISOString():null;
+  S.rem.push({id:uid(),text,due,rep,done:false,alerted:false});
+  save();$('#newtext').value='';$('#newwhen').value=defaultWhen();$('#newrep').value='none';useTime=false;renderList();
+});
+
+/* ---------- alerts ---------- */
+let current=null,audio=null,beepTimer=null;
+function beep(){
+  if(!S.sound)return;
+  try{
+    audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+    if(audio.state==='suspended')audio.resume();
+    [0,.25,.5].forEach(t=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=880;
+      o.connect(g);g.connect(audio.destination);const s=audio.currentTime+t;
+      g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.35,s+.02);g.gain.linearRampToValueAtTime(0,s+.2);o.start(s);o.stop(s+.22)});
+  }catch(e){}
+}
+function showAlert(r){
+  current=r;r.alerted=true;save();
+  $('#atext').textContent=r.text;$('#alert').classList.add('on');
+  beep();clearInterval(beepTimer);beepTimer=setInterval(beep,6000);
+}
+function closeAlert(){$('#alert').classList.remove('on');clearInterval(beepTimer);current=null;checkDue()}
+$('#adone').onclick=()=>{if(current){complete(current);save();renderList()}closeAlert()};
+$('#asnz').onclick=()=>{if(current){current.due=new Date(Date.now()+10*60000).toISOString();current.alerted=false;save();renderList()}closeAlert()};
+function checkDue(){
+  renderList();
+  if(current)return;
+  const now=Date.now();
+  const r=S.rem.find(x=>!x.done&&x.due&&!x.alerted&&+new Date(x.due)<=now);
+  if(r)showAlert(r);
+}
+setInterval(checkDue,10000);checkDue();
+/* unlock audio on first touch (iPadOS needs a gesture) */
+addEventListener('pointerdown',()=>{try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();audio.resume()}catch(e){}},{once:true});
+
+/* ---------- wake lock ---------- */
+let lock=null;
+async function wake(){
+  try{if(S.wake&&'wakeLock' in navigator&&document.visibilityState==='visible'){lock=await navigator.wakeLock.request('screen')}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){wake();tick();loadWeather();checkDue()}});
+addEventListener('pointerdown',wake);wake();
+
+/* ---------- settings ---------- */
+const modal=$('#modal');
+function openSettings(){
+  $('#h24').checked=S.h24;$('#showsec').checked=S.sec;$('#wake').checked=S.wake;$('#autodim').checked=S.dim;$('#sound').checked=S.sound;
+  $('#wuid').value=S.wu.id;$('#wukey').value=S.wu.key;$('#curcity').textContent='Current: '+S.loc.name;
+  document.querySelectorAll('#unitseg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.u===S.unit));
+  modal.classList.add('on');
+}
+$('#gear').onclick=openSettings;
+document.querySelectorAll('#unitseg button').forEach(b=>b.onclick=()=>{S.unit=b.dataset.u;document.querySelectorAll('#unitseg button').forEach(x=>x.setAttribute('aria-pressed',x===b));save();renderWeather()});
+let st;
+$('#citysearch').addEventListener('input',e=>{
+  clearTimeout(st);const q=e.target.value.trim();if(q.length<2){$('#cityres').innerHTML='';return}
+  st=setTimeout(async()=>{
+    try{const j=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=en`);
+      $('#cityres').innerHTML=(j.results||[]).map((r,i)=>`<button data-i="${i}">${esc([r.name,r.admin1,r.country_code].filter(Boolean).join(', '))}</button>`).join('')||'<div class="hint">No matches.</div>';
+      $('#cityres').onclick=ev=>{const b=ev.target.closest('button');if(!b)return;const r=j.results[+b.dataset.i];
+        S.loc={name:[r.name,r.admin1].filter(Boolean).join(', '),lat:r.latitude,lon:r.longitude};save();
+        $('#curcity').textContent='Current: '+S.loc.name;$('#cityres').innerHTML='';$('#citysearch').value='';loadWeather()};
+    }catch(err){$('#cityres').innerHTML='<div class="hint">Search needs an internet connection.</div>'}
+  },300);
+});
+$('#test').onclick=()=>{const was=S.sound;S.sound=true;beep();S.sound=was};
+$('#save').onclick=()=>{
+  S.h24=$('#h24').checked;S.sec=$('#showsec').checked;S.wake=$('#wake').checked;S.dim=$('#autodim').checked;S.sound=$('#sound').checked;
+  S.wu={id:$('#wuid').value.trim(),key:$('#wukey').value.trim()};save();
+  modal.classList.remove('on');tick();wake();loadWeather();
+};
+modal.addEventListener('click',e=>{if(e.target===modal)$('#save').click()});
+
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
