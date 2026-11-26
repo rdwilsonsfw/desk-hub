@@ -74,8 +74,15 @@ button{cursor:pointer;border:0;background:none}
 
 @media (orientation:portrait){
   .panel{grid-template-columns:1fr;padding:4vmin 4.4vmin}
-  .clock{font-size:clamp(80px,min(30vw,16vh),320px)}
+  .clock{font-size:clamp(80px,min(37vw,21vh),420px)}
   .ico svg{width:clamp(70px,13vmin,170px);height:clamp(70px,13vmin,170px)}
+}
+@media (orientation:landscape){
+  .panel{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-areas:"clock clock" "dt wx" "wd wx";grid-template-rows:auto auto 1fr;gap:1vmin 4.5vmin;padding:2.6vmin 4vmin}
+  .left{display:contents}
+  .clock{grid-area:clock;font-size:clamp(110px,min(29vw,40vh),460px);margin:0}
+  .date{grid-area:dt;align-self:end}.wd{grid-area:wd;align-self:start}
+  .right{grid-area:wx}
 }
 @media (max-height:560px) and (orientation:landscape){.days{display:none}}
 
@@ -387,6 +394,9 @@ $('#save').onclick=()=>{
   modal.classList.remove('on');FX.hm='';tick();wake();loadWeather();
 };
 modal.addEventListener('click',e=>{if(e.target===modal)$('#save').click()});
+
+/* tap anywhere (except the gear and settings) to change scene */
+document.querySelector('.stage').addEventListener('click',e=>{if(e.target.closest('#gear'))return;const L=['beach','mountains','city'];S.theme=L[(L.indexOf(S.theme)+1)%L.length];save();drawScene()});
 
 /* ---------- start ---------- */
 size();renderWeather();tick();wake();loadWeather();
