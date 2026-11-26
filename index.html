@@ -487,8 +487,9 @@ async function loadTD(){
       b.sort((x,y)=>x.due.date.localeCompare(y.due.date));
       LT.data={todo:a.slice(0,5),rem:b.slice(0,5)};LT.err='';
     }else{
-    const q=s=>td('/tasks/filter?limit=100&query='+encodeURIComponent(s)).then(j=>j.results||[]);
-    const [a,b]=await Promise.all([q('(overdue | today) & !has time'),q('(overdue | 7 days) & has time')]);
+    const q=s=>td('/tasks/filter?limit=200&query='+encodeURIComponent(s)).then(j=>j.results||[]);
+    const all=await q('overdue | today | 7 days'),today=new Date().toLocaleDateString('en-CA'),tm=t=>t.due&&t.due.date&&t.due.date.length>10;
+    const a=all.filter(t=>t.due&&t.due.date&&!tm(t)&&t.due.date<=today),b=all.filter(tm);
     const k=t=>(t.due&&t.due.date)||'9';
     a.sort((x,y)=>y.priority-x.priority||k(x).localeCompare(k(y)));
     b.sort((x,y)=>k(x).localeCompare(k(y)));
