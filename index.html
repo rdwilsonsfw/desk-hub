@@ -77,19 +77,35 @@ button{cursor:pointer;border:0;background:none}
   .clock{font-size:clamp(80px,min(37vw,21vh),420px)}
   .ico svg{width:clamp(70px,13vmin,170px);height:clamp(70px,13vmin,170px)}
 }
-.cal{display:none}
+.lt{display:none}
 @media (orientation:landscape){
   .panel{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);grid-template-areas:"clock clock" "dt wx" "wd wx" "cal wx";grid-template-rows:auto auto auto 1fr;gap:1vmin 4.5vmin;padding:2.6vmin 4vmin}
   .left{display:contents}
   .clock{grid-area:clock;font-size:clamp(110px,min(29vw,40vh),460px);margin:0}
   .date{grid-area:dt;align-self:end}.wd{grid-area:wd;align-self:start}
   .right{grid-area:wx}
-  .cal{display:grid;grid-area:cal;grid-template-columns:repeat(7,1fr);gap:.4vmin;font-size:clamp(12px,2.3vmin,26px);font-weight:700;text-align:center;align-self:start;max-width:min(100%,62vmin);margin-top:1.4vmin}
+  .lt{display:block;grid-area:cal;align-self:start;max-width:min(100%,64vmin);margin-top:1vmin;font-size:clamp(12px,2.3vmin,26px)}
+  .tabs{display:flex;gap:1vmin;margin-bottom:1vmin}
+  .tabs button{padding:.35em .8em;border-radius:99px;font-weight:700;font-size:.9em;color:var(--ink2);background:rgba(255,255,255,.1)}
+  .tabs button.on{background:var(--accent);color:#04202f}
+  .tabs .add{margin-left:auto;font-size:1.1em;padding:.2em .7em}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:.4vmin;font-weight:700;text-align:center}
+  .lt:not([data-tab=cal]) .cal{display:none}
+  .lt[data-tab=cal] .lst{display:none}
+  .lst{list-style:none;padding:0;font-weight:700}
+  .lst li{display:flex;align-items:center;gap:.7em;padding:.42em 0;border-bottom:1px solid rgba(255,255,255,.18)}
+  .lst .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lst em{font-style:normal;color:var(--accent);font-size:.85em;white-space:nowrap}
+  .lst .ck{width:1.15em;height:1.15em;border-radius:50%;border:2px solid var(--ink2);flex:none}
+  .lst .none{color:var(--ink3);border:0}
+  .lst form{display:flex;gap:.6em}
+  .lst input{flex:1;min-width:0;padding:.6em .8em;border-radius:.7em;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);font-size:1em;user-select:text;-webkit-user-select:text}
+  .lst form button{padding:0 1em;border-radius:.7em;background:var(--accent);color:#04202f;font-weight:700}
   .cal i{font-style:normal;color:var(--ink3);font-size:.8em;letter-spacing:.08em}
   .cal b,.cal span{padding:.3em 0}
   .cal b.today{background:var(--accent);color:#04202f;border-radius:.6em}
 }
-@media (max-height:560px) and (orientation:landscape){.days{display:none}.cal{display:none}}
+@media (max-height:560px) and (orientation:landscape){.days{display:none}.lt{display:none}}
 
 /* settings */
 .modal{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);z-index:20;padding:20px}
@@ -122,7 +138,7 @@ button{cursor:pointer;border:0;background:none}
     <div class="left">
       <div class="date" id="date"></div>
       <div class="wd" id="wd"></div>
-      <div class="cal" id="cal"></div>
+      <div class="lt" id="lt" data-tab="cal"><div class="tabs" id="tabs"></div><div class="cal" id="cal"></div><ul class="lst" id="lst"></ul></div>
       <div class="clock" aria-live="off"><span id="hm">--:--</span><span class="ap" id="ap"></span><span class="sec" id="sec"></span></div>
     </div>
     <div class="right">
@@ -156,6 +172,9 @@ button{cursor:pointer;border:0;background:none}
   <input type="text" id="wuid" placeholder="Station ID, for example KTXDALLA123" autocapitalize="characters" autocorrect="off">
   <label for="wukey" style="margin-top:10px">Weather Underground API key</label>
   <input type="password" id="wukey" placeholder="API key" autocorrect="off" autocapitalize="off">
+  <label for="tdkey">Todoist API token (optional)</label>
+  <input type="password" id="tdkey" placeholder="Todoist API token" autocorrect="off" autocapitalize="off">
+  <div class="hint">In Todoist: Settings, Integrations, Developer, copy the API token. Adds To-do and Reminders tabs and lets you add tasks here. The token stays on this device.</div>
   <div class="hint">Leave both blank to use Open-Meteo, which needs no key. With a station and key, the big temperature comes from your own station and the forecast still comes from Open-Meteo.</div>
   <div class="foot"><button class="btn" id="save">Done</button></div>
 </div></div>
@@ -163,7 +182,7 @@ button{cursor:pointer;border:0;background:none}
 <script>
 const $=s=>document.querySelector(s);
 const KEY='deskhub.v1';
-const defaults={loc:{name:'Dallas, Texas',lat:32.7767,lon:-96.797},unit:'f',theme:'beach',h24:false,sec:false,wake:true,dim:true,wu:{id:'',key:''},wx:null};
+const defaults={loc:{name:'Dallas, Texas',lat:32.7767,lon:-96.797},unit:'f',theme:'beach',h24:false,sec:false,wake:true,dim:true,wu:{id:'',key:''},wx:null,td:{key:''}};
 let S;
 try{S=Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=Object.assign({},defaults)}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
@@ -380,7 +399,7 @@ function marks(){
 }
 $('#gear').onclick=()=>{
   $('#h24').checked=S.h24;$('#showsec').checked=S.sec;$('#wake').checked=S.wake;$('#autodim').checked=S.dim;
-  $('#wuid').value=S.wu.id;$('#wukey').value=S.wu.key;$('#curcity').textContent='Current: '+S.loc.name;marks();modal.classList.add('on');
+  $('#wuid').value=S.wu.id;$('#wukey').value=S.wu.key;$('#tdkey').value=S.td.key;$('#curcity').textContent='Current: '+S.loc.name;marks();modal.classList.add('on');
 };
 document.querySelectorAll('#unitseg button').forEach(b=>b.onclick=()=>{S.unit=b.dataset.u;save();marks();renderWeather()});
 document.querySelectorAll('#themeseg button').forEach(b=>b.onclick=()=>{S.theme=b.dataset.t;save();marks();drawScene()});
@@ -399,17 +418,83 @@ $('#citysearch').addEventListener('input',e=>{
 });
 $('#save').onclick=()=>{
   S.h24=$('#h24').checked;S.sec=$('#showsec').checked;S.wake=$('#wake').checked;S.dim=$('#autodim').checked;
-  S.wu={id:$('#wuid').value.trim(),key:$('#wukey').value.trim()};save();
-  modal.classList.remove('on');FX.hm='';tick();wake();loadWeather();
+  S.wu={id:$('#wuid').value.trim(),key:$('#wukey').value.trim()};S.td={key:$('#tdkey').value.trim()};save();
+  modal.classList.remove('on');FX.hm='';tick();wake();loadWeather();loadTD();
 };
 modal.addEventListener('click',e=>{if(e.target===modal)$('#save').click()});
 
 /* tap anywhere (except the gear and settings) to change scene */
-document.querySelector('.stage').addEventListener('click',e=>{if(e.target.closest('#gear'))return;const L=['beach','mountains','city'];S.theme=L[(L.indexOf(S.theme)+1)%L.length];save();drawScene()});
+document.querySelector('.stage').addEventListener('click',e=>{if(e.target.closest('#gear,#lt'))return;const L=['beach','mountains','city'];S.theme=L[(L.indexOf(S.theme)+1)%L.length];save();drawScene()});
+
+/* ---------- left box: calendar / to-do / reminders (Todoist) ---------- */
+const TABS=[['cal','Calendar'],['todo','To-do'],['rem','Reminders']];
+const LT={tab:'cal',data:{todo:[],rem:[]},err:'',hold:0,adding:false};
+const escH=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tabsOn=()=>S.td&&S.td.key?TABS:TABS.slice(0,1);
+async function td(path,opt){
+  const r=await fetch('https://api.todoist.com/api/v1'+path,Object.assign({headers:{Authorization:'Bearer '+S.td.key,'Content-Type':'application/json'}},opt||{}));
+  if(!r.ok)throw new Error(r.status);
+  const t=await r.text();return t?JSON.parse(t):null;
+}
+function when(t){
+  const d=t.due&&t.due.date;if(!d)return '';
+  const today=new Date().toLocaleDateString('en-CA');
+  if(d.length>10){const x=new Date(d),tm=x.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}),dd=x.toLocaleDateString('en-CA');
+    if(dd<today)return 'overdue';return dd===today?tm:x.toLocaleDateString('en-US',{weekday:'short'})+' '+tm}
+  return d<today?'overdue':'';
+}
+function renderLT(){
+  const on=tabsOn();if(!on.some(t=>t[0]===LT.tab))LT.tab='cal';
+  $('#lt').dataset.tab=LT.tab;
+  $('#tabs').innerHTML=on.map(t=>'<button data-t="'+t[0]+'"'+(t[0]===LT.tab?' class="on"':'')+'>'+t[1]+'</button>').join('')+(LT.tab!=='cal'?'<button class="add" data-t="+" aria-label="Add">+</button>':'');
+  const L=$('#lst');if(LT.tab==='cal'){L.innerHTML='';return}
+  if(LT.adding){
+    L.innerHTML='<form id="addf"><input id="addi" type="text" autocomplete="off" placeholder="'+(LT.tab==='rem'?'Call the doctor tomorrow at 9am':'Pick up prescription')+'"><button>Add</button></form>';
+    $('#addf').onsubmit=addTask;setTimeout(()=>{const i=$('#addi');if(i)i.focus()},50);return;
+  }
+  const a=LT.data[LT.tab];
+  L.innerHTML=a.length?a.map(t=>'<li data-id="'+t.id+'"><button class="ck" aria-label="Mark done"></button><span class="tx">'+escH(t.content)+'</span><em>'+when(t)+'</em></li>').join(''):'<li class="none">'+escH(LT.err||'Nothing here')+'</li>';
+}
+async function addTask(ev){
+  ev.preventDefault();let v=$('#addi').value.trim();
+  if(v){
+    if(LT.tab==='todo'&&!/\b(today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next|every|\d+\s?(am|pm)|at \d)/i.test(v))v+=' today';
+    try{await td('/tasks/quick',{method:'POST',body:JSON.stringify({text:v})});LT.err=''}catch(e){LT.err='Could not add the task'}
+  }
+  LT.adding=false;await loadTD();
+}
+async function loadTD(){
+  if(!S.td||!S.td.key){LT.data={todo:[],rem:[]};renderLT();return}
+  try{
+    const q=s=>td('/tasks/filter?limit=100&query='+encodeURIComponent(s)).then(j=>j.results||[]);
+    const [a,b]=await Promise.all([q('(overdue | today) & !has time'),q('(overdue | 7 days) & has time')]);
+    const k=t=>(t.due&&t.due.date)||'9';
+    a.sort((x,y)=>y.priority-x.priority||k(x).localeCompare(k(y)));
+    b.sort((x,y)=>k(x).localeCompare(k(y)));
+    LT.data={todo:a.slice(0,5),rem:b.slice(0,5)};LT.err='';
+  }catch(e){LT.err=(e.message==='401'||e.message==='403')?'Check your Todoist token in settings':'Could not reach Todoist'}
+  if(!LT.adding)renderLT();
+}
+function rotateLT(){
+  if(Date.now()<LT.hold||LT.adding)return;
+  const on=tabsOn();if(on.length<2)return;
+  LT.tab=on[(on.findIndex(t=>t[0]===LT.tab)+1)%on.length][0];renderLT();
+}
+$('#lt').addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.t==='+'){LT.adding=true;LT.hold=Date.now()+120000;renderLT();return}
+  if(b.dataset.t){LT.tab=b.dataset.t;LT.adding=false;LT.hold=Date.now()+60000;renderLT();return}
+  if(b.classList.contains('ck')){
+    const li=b.closest('li'),id=li.dataset.id;LT.hold=Date.now()+60000;
+    LT.data[LT.tab]=LT.data[LT.tab].filter(t=>t.id!==id);renderLT();
+    try{await td('/tasks/'+id+'/close',{method:'POST'})}catch(err){LT.err='Could not complete the task'}
+    loadTD();
+  }
+});
 
 /* ---------- start ---------- */
 size();renderWeather();tick();wake();loadWeather();
-setInterval(tick,1000);setInterval(loadWeather,10*60*1000);
+setInterval(tick,1000);setInterval(loadWeather,10*60*1000);renderLT();loadTD();setInterval(loadTD,5*60*1000);setInterval(rotateLT,15000);
 raf=requestAnimationFrame(loop);
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
