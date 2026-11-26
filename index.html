@@ -175,6 +175,9 @@ button{cursor:pointer;border:0;background:none}
   <label for="tdkey">Todoist API token (optional)</label>
   <input type="password" id="tdkey" placeholder="Todoist API token" autocorrect="off" autocapitalize="off">
   <div class="hint">In Todoist: Settings, Integrations, Developer, copy the API token. Adds To-do and Reminders tabs and lets you add tasks here. The token stays on this device.</div>
+  <label for="tdical">Todoist calendar link (read-only, no token)</label>
+  <input type="text" id="tdical" placeholder="https://ext.todoist.com/export/ical/..." autocorrect="off" autocapitalize="off">
+  <div class="hint">In Todoist: Settings, Integrations, Calendar feed. Shows your tasks but cannot add or complete them. Use the token above if you want that.</div>
   <div class="hint">Leave both blank to use Open-Meteo, which needs no key. With a station and key, the big temperature comes from your own station and the forecast still comes from Open-Meteo.</div>
   <div class="foot"><button class="btn" id="save">Done</button></div>
 </div></div>
@@ -182,10 +185,11 @@ button{cursor:pointer;border:0;background:none}
 <script>
 const $=s=>document.querySelector(s);
 const KEY='deskhub.v1';
-const defaults={loc:{name:'Dallas, Texas',lat:32.7767,lon:-96.797},unit:'f',theme:'beach',h24:false,sec:false,wake:true,dim:true,wu:{id:'',key:''},wx:null,td:{key:''}};
+const defaults={loc:{name:'Dallas, Texas',lat:32.7767,lon:-96.797},unit:'f',theme:'beach',h24:false,sec:false,wake:true,dim:true,wu:{id:'',key:''},wx:null,td:{key:'',ical:''}};
 let S;
 try{S=Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=Object.assign({},defaults)}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+try{const h=new URLSearchParams(location.hash.slice(1));if(h.get('ical')||h.get('td')){S.td={key:h.get('td')||S.td.key||'',ical:h.get('ical')||S.td.ical||''};save();history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
 
 /* ---------- colour helpers ---------- */
 const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
@@ -399,7 +403,7 @@ function marks(){
 }
 $('#gear').onclick=()=>{
   $('#h24').checked=S.h24;$('#showsec').checked=S.sec;$('#wake').checked=S.wake;$('#autodim').checked=S.dim;
-  $('#wuid').value=S.wu.id;$('#wukey').value=S.wu.key;$('#tdkey').value=S.td.key;$('#curcity').textContent='Current: '+S.loc.name;marks();modal.classList.add('on');
+  $('#wuid').value=S.wu.id;$('#wukey').value=S.wu.key;$('#tdkey').value=S.td.key;$('#tdical').value=S.td.ical||'';$('#curcity').textContent='Current: '+S.loc.name;marks();modal.classList.add('on');
 };
 document.querySelectorAll('#unitseg button').forEach(b=>b.onclick=()=>{S.unit=b.dataset.u;save();marks();renderWeather()});
 document.querySelectorAll('#themeseg button').forEach(b=>b.onclick=()=>{S.theme=b.dataset.t;save();marks();drawScene()});
@@ -418,7 +422,7 @@ $('#citysearch').addEventListener('input',e=>{
 });
 $('#save').onclick=()=>{
   S.h24=$('#h24').checked;S.sec=$('#showsec').checked;S.wake=$('#wake').checked;S.dim=$('#autodim').checked;
-  S.wu={id:$('#wuid').value.trim(),key:$('#wukey').value.trim()};S.td={key:$('#tdkey').value.trim()};save();
+  S.wu={id:$('#wuid').value.trim(),key:$('#wukey').value.trim()};S.td={key:$('#tdkey').value.trim(),ical:$('#tdical').value.trim()};save();
   modal.classList.remove('on');FX.hm='';tick();wake();loadWeather();loadTD();
 };
 modal.addEventListener('click',e=>{if(e.target===modal)$('#save').click()});
@@ -430,7 +434,7 @@ document.querySelector('.stage').addEventListener('click',e=>{if(e.target.closes
 const TABS=[['cal','Calendar'],['todo','To-do'],['rem','Reminders']];
 const LT={tab:'cal',data:{todo:[],rem:[]},err:'',hold:0,adding:false};
 const escH=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const tabsOn=()=>S.td&&S.td.key?TABS:TABS.slice(0,1);
+const tabsOn=()=>S.td&&(S.td.key||S.td.ical)?TABS:TABS.slice(0,1);
 async function td(path,opt){
   const r=await fetch('https://api.todoist.com/api/v1'+path,Object.assign({headers:{Authorization:'Bearer '+S.td.key,'Content-Type':'application/json'}},opt||{}));
   if(!r.ok)throw new Error(r.status);
@@ -446,14 +450,14 @@ function when(t){
 function renderLT(){
   const on=tabsOn();if(!on.some(t=>t[0]===LT.tab))LT.tab='cal';
   $('#lt').dataset.tab=LT.tab;
-  $('#tabs').innerHTML=on.map(t=>'<button data-t="'+t[0]+'"'+(t[0]===LT.tab?' class="on"':'')+'>'+t[1]+'</button>').join('')+(LT.tab!=='cal'?'<button class="add" data-t="+" aria-label="Add">+</button>':'');
+  $('#tabs').innerHTML=on.map(t=>'<button data-t="'+t[0]+'"'+(t[0]===LT.tab?' class="on"':'')+'>'+t[1]+'</button>').join('')+(LT.tab!=='cal'&&!LT.ro?'<button class="add" data-t="+" aria-label="Add">+</button>':'');
   const L=$('#lst');if(LT.tab==='cal'){L.innerHTML='';return}
   if(LT.adding){
     L.innerHTML='<form id="addf"><input id="addi" type="text" autocomplete="off" placeholder="'+(LT.tab==='rem'?'Call the doctor tomorrow at 9am':'Pick up prescription')+'"><button>Add</button></form>';
     $('#addf').onsubmit=addTask;setTimeout(()=>{const i=$('#addi');if(i)i.focus()},50);return;
   }
   const a=LT.data[LT.tab];
-  L.innerHTML=a.length?a.map(t=>'<li data-id="'+t.id+'"><button class="ck" aria-label="Mark done"></button><span class="tx">'+escH(t.content)+'</span><em>'+when(t)+'</em></li>').join(''):'<li class="none">'+escH(LT.err||'Nothing here')+'</li>';
+  L.innerHTML=a.length?a.map(t=>'<li data-id="'+t.id+'">'+(LT.ro?'<span class="ck"></span>':'<button class="ck" aria-label="Mark done"></button>')+'<span class="tx">'+escH(t.content)+'</span><em>'+when(t)+'</em></li>').join(''):'<li class="none">'+escH(LT.err||'Nothing here')+'</li>';
 }
 async function addTask(ev){
   ev.preventDefault();let v=$('#addi').value.trim();
@@ -463,15 +467,32 @@ async function addTask(ev){
   }
   LT.adding=false;await loadTD();
 }
+function parseICS(t){
+  t=t.replace(/\r?\n[ \t]/g,'');
+  return t.split('BEGIN:VEVENT').slice(1).map(e=>{
+    const L=e.split(/\r?\n/),g=k=>{const l=L.find(x=>x.startsWith(k));return l?l.slice(l.indexOf(':')+1):''};
+    const dt=g('DTSTART').match(/^(\d{4})(\d\d)(\d\d)(T(\d\d)(\d\d)(\d\d)Z)?$/);if(!dt)return null;
+    const c=g('SUMMARY').replace(/\\([,;nN\\])/g,(x,y)=>y==='n'||y==='N'?' ':y);
+    return {id:'',content:c,priority:1,due:{date:dt[4]?new Date(Date.UTC(+dt[1],+dt[2]-1,+dt[3],+dt[5],+dt[6],+dt[7])).toISOString():dt[1]+'-'+dt[2]+'-'+dt[3]}};
+  }).filter(Boolean);
+}
 async function loadTD(){
-  if(!S.td||!S.td.key){LT.data={todo:[],rem:[]};renderLT();return}
+  if(!S.td||!(S.td.key||S.td.ical)){LT.data={todo:[],rem:[]};renderLT();return}
+  LT.ro=!S.td.key;
   try{
+    if(LT.ro){
+      const ev=parseICS(await (await fetch(S.td.ical)).text()),today=new Date().toLocaleDateString('en-CA'),now=Date.now();
+      const a=ev.filter(x=>x.due.date.length===10&&x.due.date<=today),b=ev.filter(x=>x.due.date.length>10&&Date.parse(x.due.date)>=now-3*864e5);
+      a.sort((x,y)=>(y.due.date===today)-(x.due.date===today)||y.due.date.localeCompare(x.due.date));
+      b.sort((x,y)=>x.due.date.localeCompare(y.due.date));
+      LT.data={todo:a.slice(0,5),rem:b.slice(0,5)};LT.err='';
+    }else{
     const q=s=>td('/tasks/filter?limit=100&query='+encodeURIComponent(s)).then(j=>j.results||[]);
     const [a,b]=await Promise.all([q('(overdue | today) & !has time'),q('(overdue | 7 days) & has time')]);
     const k=t=>(t.due&&t.due.date)||'9';
     a.sort((x,y)=>y.priority-x.priority||k(x).localeCompare(k(y)));
     b.sort((x,y)=>k(x).localeCompare(k(y)));
-    LT.data={todo:a.slice(0,5),rem:b.slice(0,5)};LT.err='';
+    LT.data={todo:a.slice(0,5),rem:b.slice(0,5)};LT.err='';}
   }catch(e){LT.err=(e.message==='401'||e.message==='403')?'Check your Todoist token in settings':'Could not reach Todoist'}
   if(!LT.adding)renderLT();
 }
