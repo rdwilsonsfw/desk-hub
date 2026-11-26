@@ -81,6 +81,20 @@ button{cursor:pointer;border:0;background:none}
 .add-more select option{color:#000}
 .add-more input{flex:1;min-width:180px}
 
+/* flare */
+#sky{position:fixed;inset:0;z-index:-2}
+#fx{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.clock{text-shadow:0 0 44px rgba(76,195,255,.3)}
+.clock .colon{display:inline-block;animation:blink 2s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.greet{font-size:clamp(14px,1.8vw,22px);color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.8em}
+.sun{display:flex;gap:18px;font-size:12.5px;color:var(--ink2);margin-top:8px;font-weight:500}
+.wx,.rem,.day{-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);box-shadow:0 10px 30px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.14)}
+.item{animation:pop .35s ease}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}}
+.wx .ico svg{animation:float 6s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-6px)}}
+
 /* alert */
 .alert{position:fixed;inset:0;display:none;place-items:center;background:rgba(3,10,18,.72);backdrop-filter:blur(8px);z-index:30;padding:24px}
 .alert.on{display:grid}
@@ -118,16 +132,18 @@ button{cursor:pointer;border:0;background:none}
 </style>
 </head>
 <body>
+<div id="sky"></div><canvas id="fx"></canvas>
 <div class="app">
   <section class="left" aria-label="Time and weather">
     <div>
+      <div class="greet" id="greet"></div>
       <div class="clock" id="clock" aria-live="off"><span id="hm">--:--</span><span class="ap" id="ap"></span><span class="sec" id="sec"></span></div>
       <div class="date" id="date"></div>
     </div>
     <div>
       <div class="wx" id="wx">
         <div class="ico" id="wico"></div>
-        <div><div class="t" id="wt">--<sup>°</sup></div><div class="c" id="wc">Loading weather</div><div class="m" id="wm"></div></div>
+        <div><div class="t" id="wt">--<sup>°</sup></div><div class="c" id="wc">Loading weather</div><div class="m" id="wm"></div><div class="sun" id="sun"></div></div>
         <div class="loc" id="wl"></div>
       </div>
       <div class="days" id="days"></div>
@@ -188,6 +204,48 @@ let S;
 try{S=Object.assign({},defaults,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=Object.assign({},defaults)}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 
+/* ---------- flare: sky and particles ---------- */
+const FX={mode:'clear',night:false,ps:[],hm:'',hr:-1,kind:''};
+function wxKind(c){if(c==null)return 'clear';if(c>=71&&c<=77||c>=85&&c<=86)return 'snow';if(c>=51&&c<=67||c>=80&&c<=82||c>=95)return 'rain';if(c===3||c===45||c===48)return 'cloud';return 'clear'}
+const cv=$('#fx'),cx=cv.getContext('2d');
+function size(){const r=window.devicePixelRatio||1;cv.width=innerWidth*r;cv.height=innerHeight*r;cx.setTransform(r,0,0,r,0,0)}
+function initFX(){
+  const W=innerWidth,H=innerHeight;FX.ps=[];
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  let n=0;
+  if(FX.mode==='rain')n=90;else if(FX.mode==='snow')n=70;else if(FX.night&&FX.mode==='clear')n=70;
+  for(let i=0;i<n;i++)FX.ps.push({x:Math.random()*W,y:Math.random()*H,r:Math.random(),s:Math.random()});
+  if(FX.mode==='cloud'||(FX.mode==='clear'&&!FX.night)){for(let i=0;i<4;i++)FX.ps.push({cloud:true,x:Math.random()*W,y:40+Math.random()*H*.5,w:180+Math.random()*220,s:.1+Math.random()*.2})}
+}
+function applySky(){
+  const d=new Date(),h=d.getHours()+d.getMinutes()/60,k=wxKind(S.wx&&S.wx.code);
+  let t,b;
+  if(h<5||h>=21){t='#040a14';b='#0c1d36'}
+  else if(h<8){t='#1d2b52';b='#8a5a63'}
+  else if(h<17){if(k==='clear'){t='#0f4a78';b='#2f8fc4'}else if(k==='cloud'){t='#2c4258';b='#526c82'}else{t='#1f2f40';b='#3a4f63'}}
+  else{t='#2a2250';b='#a85a52'}
+  $('#sky').style.background='linear-gradient(160deg,'+t+','+b+')';
+  FX.night=h<5||h>=21;FX.mode=k;initFX();
+}
+function frame(t){
+  const W=innerWidth,H=innerHeight;cx.clearRect(0,0,W,H);
+  for(const p of FX.ps){
+    if(p.cloud){p.x+=p.s;if(p.x-p.w>W)p.x=-p.w;
+      cx.save();cx.translate(p.x,p.y);cx.scale(1,.33);const g=cx.createRadialGradient(0,0,0,0,0,p.w/2);g.addColorStop(0,'rgba(255,255,255,.10)');g.addColorStop(1,'rgba(255,255,255,0)');
+      cx.fillStyle=g;cx.fillRect(-p.w/2,-p.w/2,p.w,p.w);cx.restore();continue}
+    if(FX.mode==='rain'){p.y+=9+p.s*6;p.x-=1.5;if(p.y>H){p.y=-20;p.x=Math.random()*W}
+      cx.strokeStyle='rgba(180,215,255,.35)';cx.lineWidth=1;cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(p.x+1.5,p.y-12);cx.stroke()}
+    else if(FX.mode==='snow'){p.y+=.6+p.s*1.2;p.x+=Math.sin(t/1000+p.r*10)*.4;if(p.y>H){p.y=-5;p.x=Math.random()*W}
+      cx.fillStyle='rgba(255,255,255,.7)';cx.beginPath();cx.arc(p.x,p.y,1+p.r*2,0,7);cx.fill()}
+    else{cx.fillStyle='rgba(255,255,255,'+(.25+.55*Math.abs(Math.sin(t/1600+p.r*20)))+')';cx.beginPath();cx.arc(p.x,p.y*.7,.6+p.r*1.2,0,7);cx.fill()}
+  }
+}
+let raf=0;
+function loop(t){frame(t);raf=requestAnimationFrame(loop)}
+document.addEventListener('visibilitychange',()=>{cancelAnimationFrame(raf);if(!document.hidden)raf=requestAnimationFrame(loop)});
+addEventListener('resize',()=>{size();initFX()});
+size();raf=requestAnimationFrame(loop);
+
 /* ---------- clock ---------- */
 function tick(){
   const d=new Date();
@@ -195,10 +253,12 @@ function tick(){
   const parts=new Intl.DateTimeFormat('en-US',o).formatToParts(d);
   const hm=parts.filter(p=>p.type==='hour'||p.type==='minute'||p.type==='literal').map(p=>p.value).join('').replace(/\s/g,'');
   const ap=(parts.find(p=>p.type==='dayPeriod')||{}).value||'';
-  $('#hm').textContent=hm; $('#ap').textContent=S.h24?'':ap;
+  if(hm!==FX.hm){FX.hm=hm;$('#hm').innerHTML=hm.replace(':','<span class="colon">:</span>')} $('#ap').textContent=S.h24?'':ap;
   $('#sec').textContent=S.sec?String(d.getSeconds()).padStart(2,'0'):'';
   $('#date').textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const hr=d.getHours();
+  $('#greet').textContent=hr<5?'Good night':hr<12?'Good morning':hr<17?'Good afternoon':hr<21?'Good evening':'Good night';
+  if(FX.hr!==hr){FX.hr=hr;applySky()}
   document.body.classList.toggle('dim',S.dim&&(hr>=22||hr<6));
 }
 setInterval(tick,1000);tick();
@@ -233,10 +293,10 @@ async function loadWeather(){
   try{
     const u=`https://api.open-meteo.com/v1/forecast?latitude=${S.loc.lat}&longitude=${S.loc.lon}`+
       `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,is_day`+
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max`+
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset`+
       `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto&forecast_days=5`;
     const j=await getJSON(u);
-    const w={t:j.current.temperature_2m,feels:j.current.apparent_temperature,h:j.current.relative_humidity_2m,wind:j.current.wind_speed_10m,code:j.current.weather_code,day:j.current.is_day===1,
+    const w={t:j.current.temperature_2m,feels:j.current.apparent_temperature,h:j.current.relative_humidity_2m,wind:j.current.wind_speed_10m,code:j.current.weather_code,day:j.current.is_day===1,sunrise:j.daily.sunrise[0],sunset:j.daily.sunset[0],
       days:j.daily.time.map((d,i)=>({d,code:j.daily.weather_code[i],hi:j.daily.temperature_2m_max[i],lo:j.daily.temperature_2m_min[i],p:j.daily.precipitation_probability_max[i]})),src:'Open-Meteo',at:Date.now()};
     if(S.wu.id&&S.wu.key){
       try{
@@ -263,6 +323,9 @@ function renderWeather(){
     const nm=i===0?'Today':new Date(d.d+'T12:00').toLocaleDateString('en-US',{weekday:'short'});
     return `<div class="day"><b>${nm}</b>${wmo(d.code)[1]}<div class="hl">${fmtT(toU(d.hi))}° <span>${fmtT(toU(d.lo))}°</span></div><div class="p">${d.p>=20?d.p+'% rain':''}</div></div>`;
   }).join('');
+  const wk=wxKind(w.code);if(FX.kind!==wk){FX.kind=wk;applySky()}
+  const fm=s=>new Date(s).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  $('#sun').innerHTML=w.sunrise?'<span>Sunrise '+fm(w.sunrise)+'</span><span>Sunset '+fm(w.sunset)+'</span>':'';
 }
 renderWeather();loadWeather();setInterval(loadWeather,10*60*1000);
 
